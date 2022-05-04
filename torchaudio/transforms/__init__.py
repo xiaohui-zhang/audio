@@ -15,6 +15,7 @@ from ._transforms import (
     Fade,
     FrequencyMasking,
     TimeMasking,
+    SpecAugment,
     SlidingWindowCmn,
     Vad,
     SpectralCentroid,
@@ -47,6 +48,7 @@ __all__ = [
     "RNNTLoss",
     "Resample",
     "SlidingWindowCmn",
+    "SpecAugment"
     "SpectralCentroid",
     "Spectrogram",
     "TimeMasking",

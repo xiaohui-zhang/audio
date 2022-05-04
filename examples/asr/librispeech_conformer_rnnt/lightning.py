@@ -218,10 +218,7 @@ class ConformerRNNTModule(LightningModule):
             FunctionalModule(lambda x: _piecewise_linear_log(x * _gain)),
             GlobalStatsNormalization(global_stats_path),
             FunctionalModule(lambda x: x.transpose(1, 2)),
-            torchaudio.transforms.FrequencyMasking(27),
-            torchaudio.transforms.FrequencyMasking(27),
-            torchaudio.transforms.TimeMasking(100, p=0.2),
-            torchaudio.transforms.TimeMasking(100, p=0.2),
+            torchaudio.transforms.SpecAugment(2,100,2,27,p=0.2),
             FunctionalModule(lambda x: x.transpose(1, 2)),
         )
         self.valid_data_pipeline = torch.nn.Sequential(

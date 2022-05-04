@@ -784,17 +784,22 @@ def mask_along_axis_iid(
     ``max_v = min(mask_param, floor(specgrams.size(axis) * p))`` otherwise.
 
     Args:
-        specgrams (Tensor): Real spectrograms `(batch, channel, freq, time)`
+        specgrams (Tensor): Real spectrograms `(batch, channel, freq, time)`, `(batch, freq, time)` or `(channel, freq, time)`.
         mask_param (int): Number of columns to be masked will be uniformly sampled from [0, mask_param]
         mask_value (float): Value to assign to the masked columns
-        axis (int): Axis to apply masking on (2 -> frequency, 3 -> time)
+        axis (int): Axis to apply masking on (3D specgrams:1 -> frequency, 2 -> time; 4D specgrams: 2 -> frequency, 3 -> time)
         p (float, optional): maximum proportion of columns that can be masked. (Default: 1.0)
 
     Returns:
-        Tensor: Masked spectrograms of dimensions `(batch, channel, freq, time)`
+        Tensor: Masked spectrograms with the same dimensions as input specgrams Tensor`
     """
 
-    if axis not in [2, 3]:
+    dim = specgrams.dim()
+
+    if dim not in [3, 4]:
+        raise ValueError("Spectrogram must be either a 3D or 4D tensor")
+
+    if axis not in [dim - 2, dim - 1]:
         raise ValueError("Only Frequency and Time masking are supported")
 
     if not 0.0 <= p <= 1.0:
@@ -807,8 +812,8 @@ def mask_along_axis_iid(
     device = specgrams.device
     dtype = specgrams.dtype
 
-    value = torch.rand(specgrams.shape[:2], device=device, dtype=dtype) * mask_param
-    min_value = torch.rand(specgrams.shape[:2], device=device, dtype=dtype) * (specgrams.size(axis) - value)
+    value = torch.rand(specgrams.shape[:(dim - 2)], device=device, dtype=dtype) * mask_param
+    min_value = torch.rand(specgrams.shape[:(dim - 2)], device=device, dtype=dtype) * (specgrams.size(axis) - value)
 
     # Create broadcastable mask
     mask_start = min_value.long()[..., None, None]
@@ -845,16 +850,21 @@ def mask_along_axis(
     All examples will have the same mask interval.
 
     Args:
-        specgram (Tensor): Real spectrogram `(channel, freq, time)`
+        specgram (Tensor): Real spectrogram `(channel, freq, time)` or `(freq, time)`
         mask_param (int): Number of columns to be masked will be uniformly sampled from [0, mask_param]
         mask_value (float): Value to assign to the masked columns
-        axis (int): Axis to apply masking on (1 -> frequency, 2 -> time)
+        axis (int): Axis to apply masking on (3D specgrams:1 -> frequency, 2 -> time; 2D specgrams: 0 -> frequency, 1 -> time)
         p (float, optional): maximum proportion of columns that can be masked. (Default: 1.0)
 
     Returns:
-        Tensor: Masked spectrogram of dimensions `(channel, freq, time)`
+        Tensor: Masked spectrograms with the same dimensions as input specgrams Tensor`
     """
-    if axis not in [1, 2]:
+    dim = specgrams.dim()
+
+    if dim not in [2, 3]:
+        raise ValueError("Spectrogram must be either a 2D or 3D tensor")
+
+    if axis not in [dim - 2, dim - 1]:
         raise ValueError("Only Frequency and Time masking are supported")
 
     if not 0.0 <= p <= 1.0:
@@ -864,9 +874,10 @@ def mask_along_axis(
     if mask_param < 1:
         return specgram
 
+    # This line does nothing if specgram is 2D or 3D
     # pack batch
-    shape = specgram.size()
-    specgram = specgram.reshape([-1] + list(shape[-2:]))
+    # shape = specgram.size()
+    # specgram = specgram.reshape([-1] + list(shape[-2:]))
     value = torch.rand(1) * mask_param
     min_value = torch.rand(1) * (specgram.size(axis) - value)
 
@@ -874,15 +885,17 @@ def mask_along_axis(
     mask_end = (min_value.long() + value.long()).squeeze()
     mask = torch.arange(0, specgram.shape[axis], device=specgram.device, dtype=specgram.dtype)
     mask = (mask >= mask_start) & (mask < mask_end)
-    if axis == 1:
+    # unsqueeze the mask if the axis is frequency
+    if axis == dim - 2:
         mask = mask.unsqueeze(-1)
 
     assert mask_end - mask_start < mask_param
 
     specgram = specgram.masked_fill(mask, mask_value)
 
+    # This line does nothing if specgram is 2D or 3D
     # unpack batch
-    specgram = specgram.reshape(shape[:-2] + specgram.shape[-2:])
+    # specgram = specgram.reshape(shape[:-2] + specgram.shape[-2:])
 
     return specgram
 
